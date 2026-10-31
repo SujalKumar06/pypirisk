@@ -1,0 +1,9 @@
+# Everything for local development and CI: all services plus lint, tests and docs.
+-r pipeline.txt
+-r api.txt
+-r frontend.txt
+nbconvert>=7.16
+ipykernel>=6.29
+pytest>=8.3
+pytest-cov>=5.0
+ruff>=0.8

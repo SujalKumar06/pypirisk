@@ -1,0 +1,6 @@
+# Git LFS: large static binaries only. Pipeline data, graphs and models are versioned by
+# DVC, and the 50-package CI fixture stays in plain git so CI runners can read it.
+assets/**/*.parquet filter=lfs diff=lfs merge=lfs -text
+assets/**/*.zip filter=lfs diff=lfs merge=lfs -text
+assets/**/*.png filter=lfs diff=lfs merge=lfs -text
+docs/**/*.png filter=lfs diff=lfs merge=lfs -text

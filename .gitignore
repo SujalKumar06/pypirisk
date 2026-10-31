@@ -1,0 +1,36 @@
+# Secrets
+.env
+.dvc/config.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+site/
+
+# MLflow (local runs outside Docker; the Compose server keeps its store in a volume)
+mlruns/
+mlartifacts/
+mlflow.db
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Pipeline runtime state (crawl cache is large and machine-local; logs/metrics are runtime)
+# The directories stay (via .gitkeep) so Docker bind mounts never create them as root.
+data/cache/
+logs/*
+!logs/.gitkeep
+reports/junit.xml

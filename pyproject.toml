@@ -1,0 +1,29 @@
+# Tool configuration only. The code is not installed as a package: run everything from
+# the repo root, where `python -m pypirisk.<stage>` finds the pypirisk/ folder directly.
+# Dependencies are in requirements/.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = [".", "services/api", "services/frontend", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "D", "UP", "B", "SIM"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Test names already state the behaviour they check, so docstrings there would only repeat them.
+"tests/**" = ["D"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "services/api", "services/frontend", "tests"]
+addopts = "-ra -m 'not e2e'"
+markers = [
+    "e2e: needs the Docker Compose stack running (run with `pytest -m e2e`)",
+]
+
+[tool.coverage.run]
+source = ["pypirisk", "pypirisk_api", "pypirisk_frontend"]
