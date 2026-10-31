@@ -1,0 +1,260 @@
+# Local stack. Every URL a service uses to reach another is set here through environment
+# variables; none is hard-coded in the code.
+#
+#   docker compose up -d --build                  # start all services
+#   docker compose run --rm pipeline              # dvc repro inside the pipeline image
+#
+# The repository is mounted read-only into the API (for dvc.yaml, reports, run logs and
+# batch scores) and read-write into the pipeline service, which runs DVC.
+
+x-pipeline-build: &pipeline-build
+  context: .
+  dockerfile: Dockerfile
+
+x-pipeline-image: &pipeline-image sujalkumar06/pypirisk-pipeline:${IMAGE_TAG:-latest}
+
+x-healthcheck-timing: &healthcheck-timing
+  interval: 15s
+  timeout: 5s
+  retries: 5
+
+x-repo-env: &repo-env
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  PYTHONPATH: /workspace
+  HOME: /tmp
+  PIPELINE_LOG_DIR: /workspace/logs
+  RAY_TMPDIR: /tmp/ray
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+    image: sujalkumar06/pypirisk-frontend:${IMAGE_TAG:-latest}
+    environment:
+      API_URL: http://api:8000
+      OPS_PORT: "9101"
+      # Links shown to the user's browser, so they use host ports.
+      MLFLOW_PUBLIC_URL: http://localhost:5000
+      GRAFANA_PUBLIC_URL: http://localhost:3000
+      PROMETHEUS_PUBLIC_URL: http://localhost:9090
+      ALERTMANAGER_PUBLIC_URL: http://localhost:9093
+    ports:
+      - "8501:8501"
+      - "9101:9101"
+    depends_on:
+      - api
+    healthcheck:
+      # Streamlit's own health endpoint; the /metrics side server (9101) starts with the
+      # first browser session.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      <<: *healthcheck-timing
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    image: sujalkumar06/pypirisk-api:${IMAGE_TAG:-latest}
+    environment:
+      MODEL_SERVER_URL: http://model-server:8080
+      SECONDARY_MODEL_SERVER_URL: http://ray-serve:8000
+      MLFLOW_URL: http://mlflow:5000
+      SERVING_DIR: /repo/data/serving
+      DVC_YAML_PATH: /repo/dvc.yaml
+      REPORTS_DIR: /repo/reports
+      PIPELINE_RUNS_PATH: /repo/logs/pipeline_runs.jsonl
+    volumes:
+      - .:/repo:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      - model-server
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      <<: *healthcheck-timing
+    restart: unless-stopped
+
+  model-server:
+    build: *pipeline-build
+    image: *pipeline-image
+    command: ["python", "-m", "pypirisk.serving.model_server"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_NAME: pypirisk-abandonment
+      MODEL_ALIAS: champion
+      MODEL_SERVER_PORT: "8080"
+    ports:
+      - "5001:8080"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      <<: *healthcheck-timing
+      # Stays unhealthy until the pipeline has registered a model.
+      start_period: 30s
+    restart: unless-stopped
+
+  ray-serve:
+    build: *pipeline-build
+    image: *pipeline-image
+    command: ["python", "-m", "pypirisk.serving.ray_serve"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_NAME: pypirisk-abandonment
+      MODEL_ALIAS: champion
+      RAY_SERVE_PORT: "8000"
+      RAY_TMPDIR: /tmp/ray
+      HOME: /tmp
+    shm_size: 1gb
+    ports:
+      - "8002:8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      <<: *healthcheck-timing
+      start_period: 60s
+    # Exits until a model is registered; Docker restarts it with growing back-off.
+    restart: unless-stopped
+
+  mlflow:
+    build: *pipeline-build
+    image: *pipeline-image
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=sqlite:////mlflow/mlflow.db
+      - --artifacts-destination=/mlflow/artifacts
+      - --expose-prometheus=/tmp/mlflow-metrics
+      # Containers reach MLflow as "mlflow:5000", which the DNS-rebinding guard rejects
+      # unless listed.
+      - --allowed-hosts=mlflow,mlflow:5000,localhost,localhost:5000,127.0.0.1:5000
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      <<: *healthcheck-timing
+    restart: unless-stopped
+
+  pipeline:
+    build: *pipeline-build
+    image: *pipeline-image
+    profiles: ["pipeline"]
+    command: ["dvc", "repro"]
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /workspace
+    environment:
+      <<: *repo-env
+      LOG_FORMAT: text
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    shm_size: 1gb
+    volumes:
+      - .:/workspace
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+  seaweedfs:
+    # S3-compatible object store used as the DVC remote (MinIO no longer publishes images).
+    image: chrislusf/seaweedfs:4.48
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /tmp/s3.json <<EOF
+        {"identities": [{"name": "dvc",
+          "credentials": [{"accessKey": "$${S3_ACCESS_KEY}", "secretKey": "$${S3_SECRET_KEY}"}],
+          "actions": ["Admin", "Read", "Write", "List", "Tagging"]}]}
+        EOF
+        exec weed server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json -metricsPort=9324
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
+    volumes:
+      - seaweedfs-data:/data
+    ports:
+      - "8333:8333"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9333/cluster/healthz"]
+      <<: *healthcheck-timing
+    restart: unless-stopped
+
+  seaweedfs-init:
+    image: chrislusf/seaweedfs:4.48
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["echo 's3.bucket.create -name dvc' | weed shell -master=seaweedfs:9333"]
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    restart: "no"
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      <<: *healthcheck-timing
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/healthy"]
+      <<: *healthcheck-timing
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.1.7
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      <<: *healthcheck-timing
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    command:
+      - --path.rootfs=/host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+volumes:
+  mlflow-data:
+  seaweedfs-data:
+  prometheus-data:
+  grafana-data:
