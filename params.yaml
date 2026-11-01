@@ -1,0 +1,212 @@
+# All pipeline tunables. Stages read this file; nothing here is hard-coded in pypirisk/.
+
+# Which data profile `dvc repro` runs. The committed value is `fixture` so a fresh
+# clone runs offline in a few minutes. Real runs: `dvc exp run -S profile=pilot` or `full`.
+profile: fixture
+
+profiles:
+  fixture:
+    seed_source: fixture_list
+    max_seed_packages: 50
+    expand_dependencies: false
+    max_packages: 50
+    cache_dir: data/fixture/cache
+    offline: true
+  pilot:
+    seed_source: top_packages
+    max_seed_packages: 500
+    expand_dependencies: true
+    max_packages: 1500
+    cache_dir: data/cache
+    offline: false
+  full:
+    seed_source: top_packages
+    max_seed_packages: 5000
+    expand_dependencies: true
+    max_packages: 8000
+    cache_dir: data/cache
+    offline: false
+
+# 50 widely used packages: still-active ones and ones that went quiet (toml, appdirs, ...).
+fixture_packages:
+  - requests
+  - urllib3
+  - certifi
+  - idna
+  - charset-normalizer
+  - six
+  - python-dateutil
+  - pyyaml
+  - numpy
+  - pandas
+  - setuptools
+  - packaging
+  - typing-extensions
+  - attrs
+  - click
+  - jinja2
+  - markupsafe
+  - pyparsing
+  - pytz
+  - wheel
+  - cryptography
+  - cffi
+  - pycparser
+  - colorama
+  - tabulate
+  - toml
+  - decorator
+  - appdirs
+  - oauthlib
+  - rsa
+  - pyasn1
+  - cachetools
+  - wrapt
+  - msgpack
+  - simplejson
+  - termcolor
+  - docutils
+  - pygments
+  - tqdm
+  - filelock
+  - platformdirs
+  - pluggy
+  - iniconfig
+  - py
+  - more-itertools
+  - zipp
+  - importlib-metadata
+  - websocket-client
+  - isodate
+  - retry
+
+sources:
+  top_packages_url: https://hugovk.github.io/top-pypi-packages/top-pypi-packages.min.json
+  pypi_base_url: https://pypi.org/pypi
+  ecosystems_packages_url: https://packages.ecosyste.ms/api/v1/registries/pypi.org/packages
+  ecosystems_repos_url: https://repos.ecosyste.ms/api/v1/hosts
+  ecosystems_issues_url: https://issues.ecosyste.ms/api/v1/hosts
+  github_graphql_url: https://api.github.com/graphql
+  request_timeout_seconds: 30
+
+# Requests per second per API host. ecosyste.ms allows 5,000 requests/hour anonymously
+# (1.39/s); GitHub GraphQL allows 5,000 points/hour per token. Both are kept below.
+rate_limits:
+  pypi: 10
+  ecosystems: 1.2
+  github_graphql: 1
+
+crawl:
+  # Earliest event any feature or label needs: first train snapshot minus the lookback.
+  history_start: "2017-01-01"
+  issues_page_size: 1000
+  max_issue_pages: 20
+  clone_timeout_seconds: 600
+  ray_num_cpus: 4
+  ray_object_store_mb: 500
+
+ingest:
+  output_dir: data/raw
+  report_path: reports/ingest.json
+
+validate:
+  input_dir: data/raw
+  output_dir: data/validated
+  report_path: reports/validation.json
+  max_invalid_fraction: 0.1
+
+graph:
+  input_dir: data/validated
+  output_dir: data/graph
+
+activity:
+  # Commits and issues by these authors are automation, not maintenance, and are ignored.
+  bot_author_markers: ["[bot]", "dependabot", "renovate", "pre-commit-ci", "github-actions"]
+
+snapshots:
+  # Splits are disjoint in time: each split's last outcome window ends before the next
+  # split's first snapshot (checked by pypirisk.labels.windows.check_split_windows).
+  train: ["2018-01-01", "2019-01-01", "2020-01-01", "2021-01-01"]
+  validation: ["2023-01-01"]
+  test: ["2025-01-01"]
+  # Features only (no label yet): the snapshot the served model scores.
+  scoring: "2026-11-01"
+
+features:
+  input_dir: data/validated
+  graph_dir: data/graph
+  output_path: data/features/features.parquet
+  lookback_months: 12
+
+labels:
+  input_dir: data/validated
+  output_path: data/labels/labels.parquet
+  lookback_months: 12
+  outcome_months: 18
+  # Provisional (decided 2026-10-31, to be finalised after a hand-check of ~200 labels):
+  # abandoned = archived, or 0 releases and at most this many human commits in the window.
+  max_commits_in_outcome: 2
+  min_releases_for_eligibility: 1
+
+train:
+  features_path: data/features/features.parquet
+  labels_path: data/labels/labels.parquet
+  run_info_path: models/train_run.json
+  reference_path: models/reference.json
+  experiment_name: pypirisk-abandonment
+  random_seed: 42
+  # One or two signals per feature group, plus the four network features of the problem
+  # statement: 11 in all (simplified from 21 on 2026-11-12; see docs/HLD.md D15).
+  feature_columns:
+    - months_since_last_release   # release history
+    - releases_in_lookback
+    - commits_in_lookback         # development activity
+    - months_since_last_commit
+    - bus_factor                  # maintainer concentration
+    - median_days_to_close        # issue responsiveness
+    - open_issue_share
+    - dependents                  # dependency graph (point-in-time graph of the snapshot)
+    - pagerank
+    - kcore
+    - upstream_stale_share
+  candidates: [logistic_regression, lightgbm]
+  selection_metric: validation_pr_auc
+  calibration_method: sigmoid
+  logistic_regression:
+    C: 1.0
+    max_iter: 2000
+  lightgbm:
+    n_estimators: 200
+    learning_rate: 0.05
+    num_leaves: 15
+    min_child_samples: 10
+
+evaluate:
+  metrics_path: reports/metrics.json
+  plots_dir: reports/plots
+  top_k_fraction: 0.1
+
+register:
+  model_name: pypirisk-abandonment
+  alias: champion
+  registry_path: reports/registry.json
+  # Promote only if the model beats the heuristic on test PR-AUC by at least this much
+  # and is not worse than the current champion by more than the tolerance.
+  min_gain_over_heuristic: 0.0
+  max_drop_vs_champion: 0.02
+  deploy_check_rows: 50
+
+score:
+  output_dir: data/serving
+  # Upper bounds of each grade's risk band; anything above the last is F.
+  grades: {A: 0.1, B: 0.2, C: 0.35, D: 0.5}
+
+propagation:
+  depth_decay: 0.5
+  max_depth: 6
+
+drift:
+  # Drift = |mean now - mean at the latest labelled snapshot| / its standard deviation, per
+  # model feature. Calibrated on the pilot run (2026-11-12): natural year-to-year drift
+  # peaked at 0.34, injected drift reached 2.2. Mirrored in monitoring/alert_rules.yml.
+  alert_threshold: 1.0
