@@ -1,0 +1,32 @@
+name: pypirisk
+
+# Entry points run inside the same pipeline image Docker Compose uses, so `mlflow run`
+# has the same environment as development, CI and serving. Build it first with
+# `docker compose build mlflow`.
+docker_env:
+  image: sujalkumar06/pypirisk-pipeline:latest
+  environment: ["MLFLOW_TRACKING_URI", "GITHUB_TOKEN"]
+
+entry_points:
+  main:
+    command: "dvc repro"
+  ingest:
+    command: "python -m pypirisk.ingest"
+  validate:
+    command: "python -m pypirisk.validate"
+  graph:
+    command: "python -m pypirisk.graph"
+  features:
+    command: "python -m pypirisk.features"
+  label:
+    command: "python -m pypirisk.labels"
+  train:
+    command: "python -m pypirisk.models.train"
+  evaluate:
+    command: "python -m pypirisk.models.evaluate"
+  register:
+    command: "python -m pypirisk.models.register"
+  score:
+    command: "python -m pypirisk.models.score"
+  rollback_demo:
+    command: "python -m pypirisk.ops.broken_model_demo"
