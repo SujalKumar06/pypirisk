@@ -1,0 +1,7 @@
+# Sample project for the Project Scan demo: popular packages whose risk comes from
+# their dependencies (e.g. aiohttp -> async-timeout, pandas -> python-dateutil -> six).
+requests>=2.31
+aiohttp
+google-cloud-storage
+pandas
+boto3
