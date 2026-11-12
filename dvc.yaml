@@ -1,0 +1,178 @@
+# The DVC DAG is the CI pipeline (as taught in Lecture 11): `dvc repro` lints, tests,
+# then rebuilds only the stages whose code, data or params changed.
+# Each stage is a thin CLI over library functions in pypirisk/.
+# `profile` in params.yaml picks the data: fixture (offline, 50 packages), pilot or full.
+stages:
+  lint:
+    cmd: python -m pypirisk.ops.quality lint
+    deps:
+      - pypirisk
+      - services
+      - tests
+      - pyproject.toml
+    metrics:
+      - reports/lint.json:
+          cache: false
+
+  test:
+    cmd: python -m pypirisk.ops.quality test
+    deps:
+      # Depending on the lint report runs the tests only after lint passes.
+      - reports/lint.json
+      - pypirisk
+      - services
+      - tests
+      - data/fixture/cache
+      - params.yaml
+    metrics:
+      - reports/tests.json:
+          cache: false
+
+  ingest:
+    cmd: python -m pypirisk.ingest
+    deps:
+      # The pipeline proper starts only once the tests have passed.
+      - reports/tests.json
+      - data/fixture/cache
+      - pypirisk/ingest
+    params:
+      - profile
+      - profiles
+      - fixture_packages
+      - sources
+      - crawl
+      - ingest
+      - snapshots
+    outs:
+      - data/raw
+    metrics:
+      - reports/ingest.json:
+          cache: false
+
+  validate:
+    cmd: python -m pypirisk.validate
+    deps:
+      - data/raw
+      - pypirisk/validate
+    params:
+      - validate
+    outs:
+      - data/validated
+    metrics:
+      - reports/validation.json:
+          cache: false
+
+  graph:
+    cmd: python -m pypirisk.graph
+    deps:
+      - data/validated
+      - pypirisk/graph
+    params:
+      - graph
+      - snapshots
+    outs:
+      - data/graph
+
+  features:
+    cmd: python -m pypirisk.features
+    deps:
+      - data/validated
+      - data/graph
+      - pypirisk/features
+    params:
+      - features
+      - snapshots
+    outs:
+      - data/features/features.parquet
+
+  label:
+    cmd: python -m pypirisk.labels
+    deps:
+      - data/validated
+      - pypirisk/labels
+    params:
+      - labels
+      - snapshots
+    outs:
+      - data/labels/labels.parquet
+
+  train:
+    cmd: python -m pypirisk.models.train
+    deps:
+      - data/features/features.parquet
+      - data/labels/labels.parquet
+      - pypirisk/models/train.py
+      - pypirisk/models/estimators.py
+      - pypirisk/models/explain.py
+      - pypirisk/models/pyfunc.py
+    params:
+      - train
+      - snapshots.train
+    outs:
+      # Pointer to the MLflow run; kept in git so a commit names the run it produced.
+      - models/train_run.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m pypirisk.models.evaluate
+    deps:
+      - models/train_run.json
+      - data/features/features.parquet
+      - data/labels/labels.parquet
+      - pypirisk/models/evaluate.py
+      - pypirisk/models/metrics.py
+    params:
+      - evaluate
+      - drift
+    outs:
+      # Drift reference: feature distribution of the latest labelled snapshot.
+      - models/reference.json
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/plots/pr_model.json:
+          cache: false
+      - reports/plots/pr_heuristic.json:
+          cache: false
+      - reports/plots/calibration.json:
+          cache: false
+
+  register:
+    cmd: python -m pypirisk.models.register
+    deps:
+      - models/train_run.json
+      - reports/metrics.json
+      - pypirisk/models/register.py
+      - pypirisk/models/registry.py
+    params:
+      - register
+    outs:
+      - reports/registry.json:
+          cache: false
+
+  score:
+    cmd: python -m pypirisk.models.score
+    deps:
+      - reports/registry.json
+      - data/features/features.parquet
+      - data/graph
+      - models/reference.json
+      - pypirisk/models/score.py
+    params:
+      - score
+      - snapshots.scoring
+    outs:
+      - data/serving
+
+# `dvc plots show` / `dvc plots diff <rev>` draw these from the evaluate stage's files.
+plots:
+  - Precision-recall on the test snapshot (model vs heuristic):
+      x: recall
+      y:
+        reports/plots/pr_model.json: precision
+        reports/plots/pr_heuristic.json: precision
+  - Calibration on the test snapshot:
+      x: predicted
+      y:
+        reports/plots/calibration.json: observed
