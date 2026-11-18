@@ -1,0 +1,42 @@
+[
+  {
+    "observed": 0.0,
+    "predicted": 0.0
+  },
+  {
+    "observed": 0.0,
+    "predicted": 0.00048
+  },
+  {
+    "observed": 0.0,
+    "predicted": 0.00562
+  },
+  {
+    "observed": 0.0,
+    "predicted": 0.01724
+  },
+  {
+    "observed": 0.0,
+    "predicted": 0.03287
+  },
+  {
+    "observed": 0.02174,
+    "predicted": 0.04491
+  },
+  {
+    "observed": 0.04348,
+    "predicted": 0.05956
+  },
+  {
+    "observed": 0.08511,
+    "predicted": 0.07761
+  },
+  {
+    "observed": 0.06522,
+    "predicted": 0.1045
+  },
+  {
+    "observed": 0.14894,
+    "predicted": 0.18899
+  }
+]

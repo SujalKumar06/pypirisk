@@ -1,0 +1,6 @@
+{
+  "candidate": "logistic_regression",
+  "experiment_name": "pypirisk-abandonment",
+  "model_uri": "models:/m-c96ffd1883534f21a2ae90df48d42048",
+  "run_id": "063ab6f4b804490dbec7db8615f2ec01"
+}

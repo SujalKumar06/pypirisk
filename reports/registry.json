@@ -1,0 +1,11 @@
+{
+  "alias": "champion",
+  "champion_test_pr_auc_before": null,
+  "champion_version": "1",
+  "model_name": "pypirisk-abandonment",
+  "promoted": true,
+  "reason": "bootstrap: no champion yet",
+  "replaced_version": null,
+  "run_id": "063ab6f4b804490dbec7db8615f2ec01",
+  "version": "1"
+}

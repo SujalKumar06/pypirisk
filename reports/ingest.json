@@ -1,0 +1,30 @@
+{
+  "coverage": {
+    "packages": 698,
+    "seed_packages": 500,
+    "share_archived": 0.0301,
+    "share_monorepo": 0.116,
+    "share_with_commits": 0.9183,
+    "share_with_issues": 0.9126,
+    "share_with_repository": 0.9241
+  },
+  "crawl": {
+    "cache_hits": 5078,
+    "duration_seconds": 11.82,
+    "errors_by_source": {
+      "git": 4
+    },
+    "http_requests": 5,
+    "packages": 698,
+    "packages_per_minute": 5879.0,
+    "repositories": 586
+  },
+  "profile": "pilot",
+  "rows": {
+    "commits": 1256275,
+    "issues": 755947,
+    "packages": 698,
+    "releases": 63376,
+    "requires": 4834
+  }
+}

@@ -1,0 +1,539 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python -m pypirisk.ingest
+    deps:
+    - path: data/fixture/cache
+      hash: md5
+      md5: 6455c62184d35dae349bb64040370ff2.dir
+      size: 1616028
+      nfiles: 445
+    - path: pypirisk/ingest
+      hash: md5
+      md5: 18dc15fc5e056332977eff7c201ec70e.dir
+      size: 51817
+      nfiles: 15
+    - path: reports/tests.json
+      hash: md5
+      md5: cfe184653656a91c1f06d8f12468b6c5
+      size: 158
+    params:
+      params.yaml:
+        crawl:
+          history_start: '2017-01-01'
+          issues_page_size: 1000
+          max_issue_pages: 20
+          clone_timeout_seconds: 600
+          ray_num_cpus: 4
+          ray_object_store_mb: 500
+        fixture_packages:
+        - requests
+        - urllib3
+        - certifi
+        - idna
+        - charset-normalizer
+        - six
+        - python-dateutil
+        - pyyaml
+        - numpy
+        - pandas
+        - setuptools
+        - packaging
+        - typing-extensions
+        - attrs
+        - click
+        - jinja2
+        - markupsafe
+        - pyparsing
+        - pytz
+        - wheel
+        - cryptography
+        - cffi
+        - pycparser
+        - colorama
+        - tabulate
+        - toml
+        - decorator
+        - appdirs
+        - oauthlib
+        - rsa
+        - pyasn1
+        - cachetools
+        - wrapt
+        - msgpack
+        - simplejson
+        - termcolor
+        - docutils
+        - pygments
+        - tqdm
+        - filelock
+        - platformdirs
+        - pluggy
+        - iniconfig
+        - py
+        - more-itertools
+        - zipp
+        - importlib-metadata
+        - websocket-client
+        - isodate
+        - retry
+        ingest:
+          output_dir: data/raw
+          report_path: reports/ingest.json
+        profile: pilot
+        profiles:
+          fixture:
+            seed_source: fixture_list
+            max_seed_packages: 50
+            expand_dependencies: false
+            max_packages: 50
+            cache_dir: data/fixture/cache
+            offline: true
+          pilot:
+            seed_source: top_packages
+            max_seed_packages: 500
+            expand_dependencies: true
+            max_packages: 1500
+            cache_dir: data/cache
+            offline: false
+          full:
+            seed_source: top_packages
+            max_seed_packages: 5000
+            expand_dependencies: true
+            max_packages: 8000
+            cache_dir: data/cache
+            offline: false
+        snapshots:
+          train:
+          - '2018-01-01'
+          - '2019-01-01'
+          - '2020-01-01'
+          - '2021-01-01'
+          validation:
+          - '2023-01-01'
+          test:
+          - '2025-01-01'
+          scoring: '2026-11-01'
+        sources:
+          top_packages_url: 
+            https://hugovk.github.io/top-pypi-packages/top-pypi-packages.min.json
+          pypi_base_url: https://pypi.org/pypi
+          ecosystems_packages_url: 
+            https://packages.ecosyste.ms/api/v1/registries/pypi.org/packages
+          ecosystems_repos_url: https://repos.ecosyste.ms/api/v1/hosts
+          ecosystems_issues_url: https://issues.ecosyste.ms/api/v1/hosts
+          github_graphql_url: https://api.github.com/graphql
+          request_timeout_seconds: 30
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: 59f9e9221245e6b64e14f8ab1ba58255.dir
+      size: 27923128
+      nfiles: 5
+    - path: reports/ingest.json
+      hash: md5
+      md5: e89727825ec11c61aa6205416b49149d
+      size: 608
+  validate:
+    cmd: python -m pypirisk.validate
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: 59f9e9221245e6b64e14f8ab1ba58255.dir
+      size: 27923128
+      nfiles: 5
+    - path: pypirisk/validate
+      hash: md5
+      md5: 7a459edf399f06890d73b3e6ae3aa99f.dir
+      size: 8205
+      nfiles: 3
+    params:
+      params.yaml:
+        validate:
+          input_dir: data/raw
+          output_dir: data/validated
+          report_path: reports/validation.json
+          max_invalid_fraction: 0.1
+    outs:
+    - path: data/validated
+      hash: md5
+      md5: 7d6167a2ac6c1313eb95f3879835c9be.dir
+      size: 27721813
+      nfiles: 5
+    - path: reports/validation.json
+      hash: md5
+      md5: 2831b25c328fb3923e54467a1d1df75b
+      size: 691
+  graph:
+    cmd: python -m pypirisk.graph
+    deps:
+    - path: data/validated
+      hash: md5
+      md5: 7d6167a2ac6c1313eb95f3879835c9be.dir
+      size: 27721813
+      nfiles: 5
+    - path: pypirisk/graph
+      hash: md5
+      md5: 5a6b655971973556690de0fabea237aa.dir
+      size: 5171
+      nfiles: 3
+    params:
+      params.yaml:
+        graph:
+          input_dir: data/validated
+          output_dir: data/graph
+        snapshots:
+          train:
+          - '2018-01-01'
+          - '2019-01-01'
+          - '2020-01-01'
+          - '2021-01-01'
+          validation:
+          - '2023-01-01'
+          test:
+          - '2025-01-01'
+          scoring: '2026-11-01'
+    outs:
+    - path: data/graph
+      hash: md5
+      md5: bf9d5742bb7b391da50c9bcaa12b2335.dir
+      size: 56035
+      nfiles: 2
+  features:
+    cmd: python -m pypirisk.features
+    deps:
+    - path: data/graph
+      hash: md5
+      md5: bf9d5742bb7b391da50c9bcaa12b2335.dir
+      size: 56035
+      nfiles: 2
+    - path: data/validated
+      hash: md5
+      md5: 7d6167a2ac6c1313eb95f3879835c9be.dir
+      size: 27721813
+      nfiles: 5
+    - path: pypirisk/features
+      hash: md5
+      md5: f0791bb348af3ab57d281372a54922a5.dir
+      size: 11770
+      nfiles: 5
+    params:
+      params.yaml:
+        features:
+          input_dir: data/validated
+          graph_dir: data/graph
+          output_path: data/features/features.parquet
+          lookback_months: 12
+        snapshots:
+          train:
+          - '2018-01-01'
+          - '2019-01-01'
+          - '2020-01-01'
+          - '2021-01-01'
+          validation:
+          - '2023-01-01'
+          test:
+          - '2025-01-01'
+          scoring: '2026-11-01'
+    outs:
+    - path: data/features/features.parquet
+      hash: md5
+      md5: fa0efeac997fe6d6f7fbf6f7e61f4f4d
+      size: 170436
+  label:
+    cmd: python -m pypirisk.labels
+    deps:
+    - path: data/validated
+      hash: md5
+      md5: 7d6167a2ac6c1313eb95f3879835c9be.dir
+      size: 27721813
+      nfiles: 5
+    - path: pypirisk/labels
+      hash: md5
+      md5: 5c5f34044ed17d4d5bc81e655e17bfb8.dir
+      size: 9359
+      nfiles: 4
+    params:
+      params.yaml:
+        labels:
+          input_dir: data/validated
+          output_path: data/labels/labels.parquet
+          lookback_months: 12
+          outcome_months: 18
+          max_commits_in_outcome: 2
+          min_releases_for_eligibility: 1
+        snapshots:
+          train:
+          - '2018-01-01'
+          - '2019-01-01'
+          - '2020-01-01'
+          - '2021-01-01'
+          validation:
+          - '2023-01-01'
+          test:
+          - '2025-01-01'
+          scoring: '2026-11-01'
+    outs:
+    - path: data/labels/labels.parquet
+      hash: md5
+      md5: 1dcb3f69e1bab6b2e04736deb58188d5
+      size: 13104
+  train:
+    cmd: python -m pypirisk.models.train
+    deps:
+    - path: data/features/features.parquet
+      hash: md5
+      md5: fa0efeac997fe6d6f7fbf6f7e61f4f4d
+      size: 170436
+    - path: data/labels/labels.parquet
+      hash: md5
+      md5: 1dcb3f69e1bab6b2e04736deb58188d5
+      size: 13104
+    - path: pypirisk/models/estimators.py
+      hash: md5
+      md5: b0a61d014673b90a9305b45b59007c8f
+      size: 3306
+    - path: pypirisk/models/explain.py
+      hash: md5
+      md5: 078f7b20c6722b37725b9eb92e112299
+      size: 2496
+    - path: pypirisk/models/pyfunc.py
+      hash: md5
+      md5: efa87bc49c1d5486cbeeb84eb2c6bab5
+      size: 2477
+    - path: pypirisk/models/train.py
+      hash: md5
+      md5: a8ff9c3bdc0b2c5aeea6436fb1b5347a
+      size: 10634
+    params:
+      params.yaml:
+        snapshots.train:
+        - '2018-01-01'
+        - '2019-01-01'
+        - '2020-01-01'
+        - '2021-01-01'
+        train:
+          features_path: data/features/features.parquet
+          labels_path: data/labels/labels.parquet
+          run_info_path: models/train_run.json
+          reference_path: models/reference.json
+          experiment_name: pypirisk-abandonment
+          random_seed: 42
+          feature_columns:
+          - months_since_last_release
+          - releases_in_lookback
+          - commits_in_lookback
+          - months_since_last_commit
+          - bus_factor
+          - median_days_to_close
+          - open_issue_share
+          - dependents
+          - pagerank
+          - kcore
+          - upstream_stale_share
+          candidates:
+          - logistic_regression
+          - lightgbm
+          selection_metric: validation_pr_auc
+          calibration_method: sigmoid
+          logistic_regression:
+            C: 1.0
+            max_iter: 2000
+          lightgbm:
+            n_estimators: 200
+            learning_rate: 0.05
+            num_leaves: 15
+            min_child_samples: 10
+    outs:
+    - path: models/train_run.json
+      hash: md5
+      md5: e943504ac962fdcd8166d5ff82a9af70
+      size: 195
+  evaluate:
+    cmd: python -m pypirisk.models.evaluate
+    deps:
+    - path: data/features/features.parquet
+      hash: md5
+      md5: fa0efeac997fe6d6f7fbf6f7e61f4f4d
+      size: 170436
+    - path: data/labels/labels.parquet
+      hash: md5
+      md5: 1dcb3f69e1bab6b2e04736deb58188d5
+      size: 13104
+    - path: models/train_run.json
+      hash: md5
+      md5: e943504ac962fdcd8166d5ff82a9af70
+      size: 195
+    - path: pypirisk/models/evaluate.py
+      hash: md5
+      md5: 5ba41793387db219aed5d48fffcc40e1
+      size: 6470
+    - path: pypirisk/models/metrics.py
+      hash: md5
+      md5: 20f1dc42d7b53ffc2b3a6cdb4b4cf23e
+      size: 1506
+    params:
+      params.yaml:
+        drift:
+          alert_threshold: 1.0
+        evaluate:
+          metrics_path: reports/metrics.json
+          plots_dir: reports/plots
+          top_k_fraction: 0.1
+    outs:
+    - path: models/reference.json
+      hash: md5
+      md5: 6d9df452dc38dcf9b6bc285e2c5643fa
+      size: 995
+    - path: reports/metrics.json
+      hash: md5
+      md5: c9a6a76430380f410fae83784f0fa9a3
+      size: 533
+    - path: reports/plots/calibration.json
+      hash: md5
+      md5: 851c43cece537af11fadf80b16cefc42
+      size: 568
+    - path: reports/plots/pr_heuristic.json
+      hash: md5
+      md5: 26cabe6e0e8a97edff3ecc66f72024da
+      size: 11279
+    - path: reports/plots/pr_model.json
+      hash: md5
+      md5: 5866a6571e667d2c7eb014fb6f992982
+      size: 10901
+  register:
+    cmd: python -m pypirisk.models.register
+    deps:
+    - path: models/train_run.json
+      hash: md5
+      md5: e943504ac962fdcd8166d5ff82a9af70
+      size: 195
+    - path: pypirisk/models/register.py
+      hash: md5
+      md5: a20ef5130637c46d65f0dc76fd8bd765
+      size: 6482
+    - path: pypirisk/models/registry.py
+      hash: md5
+      md5: 8cdc1e9f4825d08a85069f36718d5da7
+      size: 3151
+    - path: reports/metrics.json
+      hash: md5
+      md5: c9a6a76430380f410fae83784f0fa9a3
+      size: 533
+    params:
+      params.yaml:
+        register:
+          model_name: pypirisk-abandonment
+          alias: champion
+          registry_path: reports/registry.json
+          min_gain_over_heuristic: 0.0
+          max_drop_vs_champion: 0.02
+          deploy_check_rows: 50
+    outs:
+    - path: reports/registry.json
+      hash: md5
+      md5: 9cac4c228ef2587068ba4bb8c357d9aa
+      size: 288
+  score:
+    cmd: python -m pypirisk.models.score
+    deps:
+    - path: data/features/features.parquet
+      hash: md5
+      md5: fa0efeac997fe6d6f7fbf6f7e61f4f4d
+      size: 170436
+    - path: data/graph
+      hash: md5
+      md5: bf9d5742bb7b391da50c9bcaa12b2335.dir
+      size: 56035
+      nfiles: 2
+    - path: models/reference.json
+      hash: md5
+      md5: 6d9df452dc38dcf9b6bc285e2c5643fa
+      size: 995
+    - path: pypirisk/models/score.py
+      hash: md5
+      md5: e0a883a4475fdbd4665aacf381a16439
+      size: 4220
+    - path: reports/registry.json
+      hash: md5
+      md5: 9cac4c228ef2587068ba4bb8c357d9aa
+      size: 288
+    params:
+      params.yaml:
+        score:
+          output_dir: data/serving
+          grades:
+            A: 0.1
+            B: 0.2
+            C: 0.35
+            D: 0.5
+        snapshots.scoring: '2026-11-01'
+    outs:
+    - path: data/serving
+      hash: md5
+      md5: bbebde84619b81669223cc44baa124e1.dir
+      size: 129185
+      nfiles: 5
+  lint:
+    cmd: python -m pypirisk.ops.quality lint
+    deps:
+    - path: pypirisk
+      hash: md5
+      md5: be47da40ae195afe7ab6911a838034f1.dir
+      size: 169009
+      nfiles: 62
+    - path: pyproject.toml
+      hash: md5
+      md5: e1c66fc31193b511f011be9b2403b7a3
+      size: 915
+    - path: services
+      hash: md5
+      md5: 49b2d05fe0272583201aaa7532fb6079.dir
+      size: 57990
+      nfiles: 20
+    - path: tests
+      hash: md5
+      md5: 5dd4a854095b493d86db8f0505c2ad21.dir
+      size: 62206
+      nfiles: 14
+    outs:
+    - path: reports/lint.json
+      hash: md5
+      md5: 6957aca4652b7b5a6b19e536f3a1ac8e
+      size: 52
+  test:
+    cmd: python -m pypirisk.ops.quality test
+    deps:
+    - path: data/fixture/cache
+      hash: md5
+      md5: 6455c62184d35dae349bb64040370ff2.dir
+      size: 1616028
+      nfiles: 445
+    - path: params.yaml
+      hash: md5
+      md5: a34b02518bdb2919042d553da05123b1
+      size: 5910
+    - path: pypirisk
+      hash: md5
+      md5: be47da40ae195afe7ab6911a838034f1.dir
+      size: 169009
+      nfiles: 62
+    - path: reports/lint.json
+      hash: md5
+      md5: 6957aca4652b7b5a6b19e536f3a1ac8e
+      size: 52
+    - path: services
+      hash: md5
+      md5: 49b2d05fe0272583201aaa7532fb6079.dir
+      size: 57990
+      nfiles: 20
+    - path: tests
+      hash: md5
+      md5: 7cc7c0ea193c3c00dbdec92c545cc655.dir
+      size: 62082
+      nfiles: 14
+    outs:
+    - path: reports/tests.json
+      hash: md5
+      md5: cfe184653656a91c1f06d8f12468b6c5
+      size: 158

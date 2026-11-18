@@ -1,0 +1,37 @@
+{
+  "summary": {
+    "invalid_fraction": 0.00035653707360904896,
+    "records_per_second": 91160.3,
+    "rows_in": 2081130,
+    "rows_rejected": 742
+  },
+  "tables": {
+    "commits": {
+      "reasons": {},
+      "rows_in": 1256275,
+      "rows_rejected": 0
+    },
+    "issues": {
+      "reasons": {
+        "closed before created": 742
+      },
+      "rows_in": 755947,
+      "rows_rejected": 742
+    },
+    "packages": {
+      "reasons": {},
+      "rows_in": 698,
+      "rows_rejected": 0
+    },
+    "releases": {
+      "reasons": {},
+      "rows_in": 63376,
+      "rows_rejected": 0
+    },
+    "requires": {
+      "reasons": {},
+      "rows_in": 4834,
+      "rows_rejected": 0
+    }
+  }
+}

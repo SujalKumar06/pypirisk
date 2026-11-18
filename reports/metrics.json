@@ -1,0 +1,14 @@
+{
+  "test_heuristic_pr_auc": 0.06465391922209007,
+  "test_heuristic_roc_auc": 0.6730567226890756,
+  "test_model_pr_auc": 0.12754797129613304,
+  "test_model_roc_auc": 0.8392857142857143,
+  "test_prevalence": 0.03655913978494624,
+  "test_rows": 465.0,
+  "validation_heuristic_pr_auc": 0.13950723110368446,
+  "validation_heuristic_roc_auc": 0.782312925170068,
+  "validation_model_pr_auc": 0.1908626572485416,
+  "validation_model_roc_auc": 0.8376220053238687,
+  "validation_prevalence": 0.04956896551724138,
+  "validation_rows": 464.0
+}
