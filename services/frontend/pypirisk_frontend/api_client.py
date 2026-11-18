@@ -7,6 +7,8 @@ import httpx
 from prometheus_client import Counter, Histogram
 
 # PEP 508 project name: letters, digits, '.', '_' and '-', starting and ending alphanumeric.
+# AI-generated (Claude Code). Prompt (condensed): "A regex that accepts a valid PEP 508
+# project name and nothing else."
 _PACKAGE_NAME = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$")
 
 API_CALLS = Counter(

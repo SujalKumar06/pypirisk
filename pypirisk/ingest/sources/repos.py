@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 
 # host/owner/repo at the start of a URL; anything after (tree/main, issues, .git) is dropped.
+# AI-generated (Claude Code). Prompt (condensed): "A regex that takes the host, owner and
+# repository name from a GitHub, GitLab, Bitbucket or Codeberg URL and ignores the rest."
 _REPO_URL = re.compile(
     r"^(?:git\+)?https?://(?:www\.)?(github\.com|gitlab\.com|bitbucket\.org|codeberg\.org)"
     r"/([\w.-]+)/([\w.-]+)",
@@ -14,6 +16,8 @@ _REPO_URL = re.compile(
 RESERVED_OWNERS = {"sponsors", "orgs", "apps", "marketplace", "features", "topics", "about"}
 
 # project_urls labels that usually point at the source repository, checked first.
+# AI-generated (Claude Code). Prompt (condensed): "A case-insensitive regex for PyPI
+# project_urls labels that usually mean the source repository."
 _SOURCE_LABEL = re.compile(r"source|repo|code|github|gitlab|git", re.IGNORECASE)
 
 # ecosyste.ms names hosts by service, not by domain.
