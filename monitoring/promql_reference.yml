@@ -1,0 +1,76 @@
+# PromQL generated with an AI coding agent (Claude Code), then reviewed.
+# Reference only: Prometheus loads alert_rules.yml, and Grafana loads grafana/dashboard.json.
+# JSON has no comments, so the dashboard's prompt is kept here.
+
+alert_rules:
+  # Prompt (condensed from the conversation): "Write Prometheus alert rules for: any scrape
+  # target down for a minute; API 5xx responses above 5% of requests over 5 minutes; API p95
+  # latency above 1 s from the http_request_duration_seconds histogram; the largest value of
+  # the pypirisk_feature_drift gauge above 1 for a minute; and less than 10% free space on /
+  # from node_exporter, ignoring tmpfs and overlay."
+  - name: ServiceDown
+    expr: up == 0
+    computes: a scrape target that Prometheus cannot reach (for 1m)
+  - name: ApiHighErrorRate
+    expr: sum(rate(http_requests_total{service="api", status=~"5.."}[5m])) / sum(rate(http_requests_total{service="api"}[5m])) > 0.05
+    computes: share of API requests that failed with 5xx over 5 minutes
+  - name: ApiSlowRequests
+    expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service="api"}[5m]))) > 1
+    computes: p95 API latency from the histogram buckets
+  - name: FeatureDriftDetected
+    expr: max(pypirisk_feature_drift) > 1
+    computes: the largest feature drift, in standard deviations (for 1m)
+  - name: HostLowDiskSpace
+    expr: node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} < 0.10
+    computes: free share of the root filesystem
+
+dashboard_panels:
+  # Prompt (condensed from the conversation): "Build a Grafana dashboard with: up per job;
+  # firing alerts; resident memory per job; API request rate by route and status and p50/p95
+  # latency from http_request_duration_seconds_bucket; the same rate for the model servers;
+  # p95 of api_model_server_request_duration_seconds per backend; median of api_risk_score;
+  # mean dependencies per scan; unscored lookups; drift per feature and its maximum;
+  # frontend calls by outcome; MLflow request rate; Grafana, Prometheus and Alertmanager
+  # request rates; host CPU, memory and free disk from node_exporter."
+  - panel: Scrape target up (1 = up)
+    expr: up
+  - panel: Firing alerts
+    expr: count by (alertname) (ALERTS{alertstate="firing"})
+  - panel: Resident memory by service
+    expr: process_resident_memory_bytes
+  - panel: API requests / s by route and status
+    expr: sum by (route, status) (rate(http_requests_total{service="api"}[1m]))
+  - panel: API latency p50
+    expr: histogram_quantile(0.5, sum by (le) (rate(http_request_duration_seconds_bucket{service="api"}[5m])))
+  - panel: API latency p95
+    expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service="api"}[5m])))
+  - panel: Model server and Ray Serve requests / s
+    expr: sum by (service, status) (rate(http_requests_total{service=~"model-server|ray-serve", route="/invocations"}[1m]))
+  - panel: API wait on each serving backend (p95)
+    expr: histogram_quantile(0.95, sum by (le, backend) (rate(api_model_server_request_duration_seconds_bucket[5m])))
+  - panel: Median risk served, by source
+    expr: histogram_quantile(0.5, sum by (le, source) (rate(api_risk_score_bucket[15m])))
+  - panel: Dependencies per project scan (mean)
+    expr: rate(api_scan_dependencies_sum[15m]) / rate(api_scan_dependencies_count[15m])
+  - panel: Lookups of unscored packages / min
+    expr: rate(api_unscored_lookups_total[5m]) * 60
+  - panel: Feature drift per feature
+    expr: pypirisk_feature_drift
+  - panel: Largest feature drift (alert at 1)
+    expr: max(pypirisk_feature_drift)
+  - panel: Frontend calls to the API
+    expr: sum by (endpoint, outcome) (rate(frontend_api_calls_total[5m]))
+  - panel: MLflow tracking server requests / s
+    expr: sum by (status) (rate(flask_http_request_total[5m]))
+  - panel: Grafana requests / s
+    expr: sum(rate(grafana_http_request_duration_seconds_count[5m]))
+  - panel: Prometheus requests / s
+    expr: sum(rate(prometheus_http_requests_total[5m]))
+  - panel: Alertmanager requests / s
+    expr: sum(rate(alertmanager_http_request_duration_seconds_count[5m]))
+  - panel: CPU busy
+    expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]))
+  - panel: Memory used
+    expr: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+  - panel: Free disk space by mount
+    expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}
