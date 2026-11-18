@@ -471,7 +471,7 @@ stages:
     outs:
     - path: data/serving
       hash: md5
-      md5: bbebde84619b81669223cc44baa124e1.dir
+      md5: faf8853f377977d9b027af70766577e4.dir
       size: 129185
       nfiles: 5
   lint:
@@ -479,8 +479,8 @@ stages:
     deps:
     - path: pypirisk
       hash: md5
-      md5: be47da40ae195afe7ab6911a838034f1.dir
-      size: 169009
+      md5: 9c6cfb5efdd1399b63cc5dd6eab3ee9b.dir
+      size: 169286
       nfiles: 62
     - path: pyproject.toml
       hash: md5
@@ -511,12 +511,12 @@ stages:
       nfiles: 445
     - path: params.yaml
       hash: md5
-      md5: a34b02518bdb2919042d553da05123b1
-      size: 5910
+      md5: 3c8868b894859ad4475749e5298fee25
+      size: 5912
     - path: pypirisk
       hash: md5
-      md5: be47da40ae195afe7ab6911a838034f1.dir
-      size: 169009
+      md5: 9c6cfb5efdd1399b63cc5dd6eab3ee9b.dir
+      size: 169286
       nfiles: 62
     - path: reports/lint.json
       hash: md5
@@ -529,8 +529,8 @@ stages:
       nfiles: 20
     - path: tests
       hash: md5
-      md5: 7cc7c0ea193c3c00dbdec92c545cc655.dir
-      size: 62082
+      md5: 5dd4a854095b493d86db8f0505c2ad21.dir
+      size: 62206
       nfiles: 14
     outs:
     - path: reports/tests.json

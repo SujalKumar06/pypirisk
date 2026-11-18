@@ -1,0 +1,13 @@
+{
+  "integration": {
+    "passed": 8
+  },
+  "leakage": {
+    "passed": 5
+  },
+  "total_failed": 0,
+  "total_passed": 153,
+  "unit": {
+    "passed": 140
+  }
+}
